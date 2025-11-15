@@ -5,7 +5,6 @@ import (
 	"api-gateway/internal/handlers"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/tools/go/cfg"
 )
 
 type Server struct {
@@ -24,7 +23,7 @@ func NewServer(cfg *config.Config) *Server {
 	}
 }
 
-func (s *Server) setupRoutes(){
+func (s *Server) setupRoutes() {
 	s.router.GET("/health", handlers.HealthCheck)
 
 	api := s.router.Group("/api/v1")
