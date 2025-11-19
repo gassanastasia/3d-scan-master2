@@ -4,7 +4,6 @@ import (
 	"api-gateway/internal/config"
 	"api-gateway/internal/handlers"
 	"api-gateway/internal/middleware"
-	"go/printer"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -34,6 +33,7 @@ func NewServer(cfg *config.Config) *Server {
 func (s *Server) setupMiddleware() {
 	s.router.Use(middleware.Logger())
 	s.router.Use(middleware.CORS())
+	s.router.Use(middleware.RequestID())
 	s.router.Use(middleware.TenantAuth())
 }
 
@@ -46,6 +46,7 @@ func (s *Server) setupRoutes() {
 	api := s.router.Group("/api/v2")
 	{
 		api.GET("/status", handlers.GetStatus)
+
 		tenants := api.Group("/tenants")
 		{
 			tenants.POST("/", handlers.CreateTenant)
@@ -55,14 +56,12 @@ func (s *Server) setupRoutes() {
 		scans.Use(middleware.RequireTenant())
 		{
 			scans.POST("/", handlers.CreateScan)
-			scans.POST("/", handlers.GetPrinters) //временно
 		}
 
 		printers := api.Group("/printers")
 		printers.Use(middleware.RequireTenant())
 		{
 			printers.GET("/", handlers.GetPrinters)
-			printers.POST("/:id/print", handlers.StartPrint)
 		}
 	}
 }
