@@ -1,0 +1,13 @@
+
+services:
+  gateway:
+    build: ./gateway
+    ports:
+      - "8000:8000"
+  
+  printer-mock:
+    build: ./printer-mock
+    environment:
+      PRINTER_ID: virtual-printer-1
+    depends_on:
+      - gateway

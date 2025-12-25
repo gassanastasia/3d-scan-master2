@@ -12,7 +12,7 @@ type ClientType string
 
 const (
 	UserClient ClientType = "user"
-	PrinterClient ClientType = "priter"
+	PrinterClient ClientType = "printer"
 )
 
 type Client struct {
@@ -30,7 +30,7 @@ type Message struct {
 
 var (
 	users = make(map[string]*Client)
-	priters = make(map[string]*Client)
+	printers = make(map[string]*Client)
 )
 
 var upgrader = websocket.Upgrader{
@@ -45,6 +45,20 @@ func wsHandler(w http.ResponseWriter, r *http.Request){
 	}
 
 	client := &Client{Conn: conn}
+	
+	defer func() {
+		if client.Type == PrinterClient {
+			delete(printers, client.PrinterID)
+			log.Println("printer disconnectes:", client.PrinterID)
+		}
+
+		if client.Type == UserClient {
+			delete(users, client.UserID)
+			log.Println("user disconnected:", client.UserID)
+		}
+	}()
+
+	log.Println("new ws connection")
 
 	for {
 		var msg Message
@@ -54,7 +68,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request){
 		}
 
 		switch msg.Type {
-		case "ayth":
+		case "auth":
 			handleUserAuth(client, msg.Payload)
 		case "register_printer":
 			handlePrinterRegister(client, msg.Payload)
@@ -73,13 +87,46 @@ func handleUserAuth(c *Client, payload json.RawMessage) {
 	log.Println("user authentificated:", c.UserID)
 }
 func handlePrinterRegister(c *Client, payload json.RawMessage) {
+	var p struct {
+		PrinterID string `json:"printer_id"`
+	}
 	
-	
+	if err := json.Unmarshal(payload, &p); err != nil {
+		log.Println("invalid printer payload:", err)
+		return
+	}
+
+	if p.PrinterID == "" {
+		log.Println("empty printer_id in register_printer")
+		return
+	}
+
 	c.Type = PrinterClient
 	c.PrinterID = p.PrinterID
-	priters[c.PrinterID] = c
+	printers[c.PrinterID] = c
+
+	send(c,"printer_registered", map[string]string{
+		"printer_id": c.PrinterID,
+	})
+
 	log.Println("printer registered:", c.PrinterID)
 }
 func handleTelemetry(c *Client, payload json.RawMessage) {
+	if c.Type != PrinterClient {
+		log.Println("telemetry from non-printer client")
+		return
+	}
+
 	log.Println("telemetry from", c.PrinterID, string(payload))
+}
+
+func send(c *Client, msgType string, payload any){
+	msg := map[string]any{
+		"type": msgType,
+		"payload": payload,
+	}
+
+	if err := c.Conn.WriteJSON(msg); err != nil {
+		log.Println("send error:", err)
+	}
 }
